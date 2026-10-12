@@ -1,0 +1,32 @@
+{
+  "name": "masterscooter-plataforma",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Plataforma da Master Scooter Motos: site, área do cliente, agenda e painel. Desenvolvida pela Sena SERVUS.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:unit && npm run test:db",
+    "test:unit": "node --test --experimental-strip-types \"tests/unit/*.test.ts\"",
+    "test:db": "node --test \"tests/db/*.test.mjs\""
+  },
+  "dependencies": {
+    "@supabase/ssr": "0.7.0",
+    "@supabase/supabase-js": "2.75.1",
+    "next": "15.5.26",
+    "react": "19.1.9",
+    "react-dom": "19.1.9",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.8",
+    "@types/pg": "8.15.5",
+    "@types/react": "19.1.17",
+    "@types/react-dom": "19.1.11",
+    "pg": "8.16.3",
+    "typescript": "5.8.3"
+  },
+  "engines": { "node": ">=22" }
+}
