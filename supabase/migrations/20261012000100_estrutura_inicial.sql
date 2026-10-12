@@ -197,6 +197,8 @@ create table public.agendamentos (
   solicitacao_id uuid not null references public.solicitacoes (id) on delete cascade,
   recurso_id uuid not null references public.recursos (id),
   periodo tstzrange not null check (not isempty(periodo)),
+  inicio timestamptz generated always as (lower(periodo)) stored,
+  fim timestamptz generated always as (upper(periodo)) stored,
   estado public.estado_agendamento not null default 'confirmado',
   confirmado_por uuid,
   criado_em timestamptz not null default now(),

@@ -1,6 +1,6 @@
 // Testes das regras do banco num PostgreSQL real (sem Supabase): acesso, prioridade e agenda.
 // Requer um PostgreSQL 16 local. Padrão: socket em /tmp/pg, porta 54329, usuário postgres.
-// Para outro servidor, defina TEST_PG_HOST, TEST_PG_PORT e TEST_PG_USER.
+// Para outro servidor, defina TEST_PG_HOST, TEST_PG_PORT, TEST_PG_USER e TEST_PG_PASSWORD.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -11,6 +11,7 @@ const conn = {
   host: process.env.TEST_PG_HOST ?? '/tmp/pg',
   port: Number(process.env.TEST_PG_PORT ?? 54329),
   user: process.env.TEST_PG_USER ?? 'postgres',
+  password: process.env.TEST_PG_PASSWORD,
 };
 const DB = 'masterscooter_teste';
 const root = new URL('../../', import.meta.url);
@@ -204,4 +205,9 @@ test('12. histórico disponível só para o dono e a equipe; notas internas nunc
   assert.equal(auditoriaCliente.rowCount, 0);
   const auditoriaAdmin = await como(U.admin, `select count(*)::int as n from public.auditoria where tabela = 'agendamentos'`);
   assert.ok(auditoriaAdmin.rows[0].n >= 3);
+});
+
+test('agenda expõe início e fim prontos para a interface', async () => {
+  const r = await como(U.ana, `select to_char(inicio at time zone 'America/Sao_Paulo', 'HH24:MI') as i, to_char(fim at time zone 'America/Sao_Paulo', 'HH24:MI') as f from public.agendamentos where solicitacao_id = $1`, [estado.anaSol]);
+  assert.deepEqual(r.rows[0], { i: '10:00', f: '11:00' });
 });
