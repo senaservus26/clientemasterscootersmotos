@@ -4,7 +4,7 @@ Plataforma digital da Master Scooter Motos (Praia Grande/SP), desenvolvida pela 
 
 Stack: Next.js 15 (App Router) + TypeScript, Supabase (PostgreSQL, login e armazenamento) e hospedagem na Vercel.
 
-## Situação atual (entrega E2)
+## Situação atual (entregas E2 e E3)
 
 | Parte | Situação |
 | --- | --- |
@@ -13,7 +13,8 @@ Stack: Next.js 15 (App Router) + TypeScript, Supabase (PostgreSQL, login e armaz
 | Segurança por linha (RLS): cada cliente vê só os próprios dados; notas internas só para a equipe | Pronto e testado |
 | Login sem senha por código de e-mail | Código pronto; depende do projeto Supabase para funcionar |
 | Área do cliente: cadastro, scooter, solicitação, protocolo, andamento, escolha de horário | Código pronto e compilando; depende do projeto Supabase |
-| Painel da oficina (triagem e agenda) | Próxima entrega (E3/E4). As funções do banco já existem |
+| Painel da oficina (`/painel`): fila por prioridade e risco, triagem, notas internas, confirmação e cancelamento de horário | Código pronto e compilando; depende do projeto Supabase |
+| Agenda do dia por box, ocupação, preferências dos clientes e bloqueios de horário (`/painel/agenda`) | Código pronto e compilando; depende do projeto Supabase |
 | Fotos e vídeos na solicitação | Próxima entrega, com armazenamento privado |
 | WhatsApp | Entrega E6; nada integrado ainda |
 
@@ -24,7 +25,7 @@ Os serviços e o horário vêm do Instagram @masterscootermotos e ainda precisam
 ```
 supabase/migrations/   estrutura do banco, regras e permissões (aplicar em ordem)
 supabase/seed.sql      dados iniciais da oficina
-src/app/               páginas (início, entrar, área do cliente)
+src/app/               páginas (início, entrar, área do cliente, painel da oficina)
 src/lib/               validação dos formulários, acesso ao Supabase, rótulos
 tests/unit/            testes da validação
 tests/db/              testes das regras do banco num PostgreSQL real

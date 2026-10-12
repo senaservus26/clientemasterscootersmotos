@@ -211,3 +211,26 @@ test('agenda expõe início e fim prontos para a interface', async () => {
   const r = await como(U.ana, `select to_char(inicio at time zone 'America/Sao_Paulo', 'HH24:MI') as i, to_char(fim at time zone 'America/Sao_Paulo', 'HH24:MI') as f from public.agendamentos where solicitacao_id = $1`, [estado.anaSol]);
   assert.deepEqual(r.rows[0], { i: '10:00', f: '11:00' });
 });
+
+test('painel: atendente salva triagem sem mexer na prioridade e gerencia bloqueios; cliente não', async () => {
+  const atual = await pool.query('select prioridade from public.solicitacoes where id = $1', [estado.anaSol]);
+  const p = atual.rows[0].prioridade;
+  // o painel reenvia a prioridade atual quando a pessoa não pode alterá-la
+  await como(U.atendente, `select public.atualizar_triagem($1, status, $2::public.prioridade, null, 45, 'Cliente ligou confirmando.')
+                           from public.solicitacoes where id = $1`, [estado.anaSol, p]);
+  const depois = await pool.query('select prioridade, tempo_estimado_min from public.solicitacoes where id = $1', [estado.anaSol]);
+  assert.deepEqual([depois.rows[0].prioridade, depois.rows[0].tempo_estimado_min], [p, 45]);
+
+  // mesmo formato de período que o painel envia
+  const periodo = `[${dia}T08:00:00-03:00,${dia}T09:00:00-03:00)`;
+  const b = await como(U.atendente, `insert into public.bloqueios (periodo, motivo, criado_por) values ($1, 'Feriado municipal', $2) returning id`, [periodo, U.atendente]);
+  const h = await como(U.ana, `select to_char(inicio at time zone 'America/Sao_Paulo', 'HH24:MI') as h from public.horarios_disponiveis($1, 'freios')`, [dia]);
+  assert.ok(!h.rows.some((x) => x.h === '08:00'));
+  const doDia = await como(U.atendente, `select count(*)::int as n from public.bloqueios where periodo && tstzrange($1, $2)`, [`${dia}T00:00:00-03:00`, `${dia}T23:59:59-03:00`]);
+  assert.ok(doDia.rows[0].n >= 1);
+  await falha(como(U.ana, `insert into public.bloqueios (periodo, motivo) values ($1, 'Teste')`, [periodo]), /permission denied|row-level security/);
+  const anaApaga = await como(U.ana, 'delete from public.bloqueios where id = $1', [b.rows[0].id]);
+  assert.equal(anaApaga.rowCount, 0);
+  const apagado = await como(U.atendente, 'delete from public.bloqueios where id = $1', [b.rows[0].id]);
+  assert.equal(apagado.rowCount, 1);
+});

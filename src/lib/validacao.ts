@@ -54,3 +54,45 @@ export type Resultado = { ok: true; mensagem?: string } | { ok: false; erro: str
 export function primeiroErro(e: z.ZodError): string {
   return e.issues[0]?.message ?? 'Confira os dados informados.';
 }
+
+// ---------------------------------------------------------------- painel da oficina
+const STATUS_TRIAGEM = [
+  'recebida', 'aguardando_avaliacao', 'aguardando_info_cliente', 'aguardando_aprovacao_especialista',
+  'aguardando_agendamento', 'agendado', 'veiculo_recebido', 'em_manutencao', 'aguardando_aprovacao_orcamento',
+  'concluido', 'cancelado',
+] as const;
+const hhmm = z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, 'Horário inválido.');
+
+export const triagemSchema = z.object({
+  solicitacaoId: z.string().uuid(),
+  status: z.enum(STATUS_TRIAGEM),
+  prioridade: z.union([z.literal(''), z.enum(['baixa', 'media', 'alta', 'urgente'])]).transform((v) => v || null),
+  servico: z.union([z.literal(''), z.string().regex(/^[a-z0-9-]+$/)]).transform((v) => v || null),
+  tempoEstimado: z.union([z.literal(''), z.coerce.number().int().min(15, 'Tempo estimado mínimo: 15 minutos.').max(4800, 'Tempo estimado acima do limite.')])
+    .transform((v) => (v === '' ? null : v)),
+  nota: textoOpcional(2000),
+});
+
+export const confirmacaoSchema = z.object({
+  solicitacaoId: z.string().uuid(),
+  inicio: z.string().datetime({ offset: true }),
+});
+
+export const cancelamentoSchema = z.object({
+  agendamentoId: z.string().uuid(),
+  solicitacaoId: z.string().uuid(),
+  motivo: z.string().trim().min(3, 'Informe o motivo do cancelamento.').max(200),
+});
+
+// O Brasil não tem horário de verão desde 2019; o fuso de Praia Grande é sempre -03:00.
+export const bloqueioSchema = z.object({
+  data: z.string().date('Data inválida.'),
+  inicio: hhmm,
+  fim: hhmm,
+  recursoId: z.union([z.literal(''), z.string().uuid()]).transform((v) => v || null),
+  motivo: z.string().trim().min(2, 'Informe o motivo do bloqueio.').max(200),
+}).refine((b) => b.fim > b.inicio, { message: 'O fim precisa ser depois do início.', path: ['fim'] })
+  .transform((b) => ({
+    recursoId: b.recursoId, motivo: b.motivo, data: b.data,
+    periodo: `[${b.data}T${b.inicio}:00-03:00,${b.data}T${b.fim}:00-03:00)`,
+  }));

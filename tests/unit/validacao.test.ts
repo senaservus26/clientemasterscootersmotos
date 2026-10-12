@@ -37,3 +37,21 @@ test('erros do banco viram mensagens sem detalhes internos', () => {
   assert.match(mensagemDoBanco({ code: '23P01', message: 'conflicting key value violates exclusion constraint' }), /ocupado/);
   assert.doesNotMatch(mensagemDoBanco({ code: '42501', message: 'permission denied for table solicitacoes' }), /permission|table/);
 });
+
+test('triagem converte campos vazios em nulo e limita o tempo estimado', async () => {
+  const { triagemSchema } = await import('../../src/lib/validacao.ts');
+  const base = { solicitacaoId: '7b0c1f1e-5d7a-4f33-9b8e-2a1b3c4d5e6f', status: 'aguardando_agendamento', prioridade: '', servico: '', tempoEstimado: '', nota: '' };
+  const r = triagemSchema.parse(base);
+  assert.deepEqual([r.prioridade, r.servico, r.tempoEstimado, r.nota], [null, null, null, undefined]);
+  assert.equal(triagemSchema.parse({ ...base, prioridade: 'alta', tempoEstimado: '90' }).tempoEstimado, 90);
+  assert.equal(triagemSchema.safeParse({ ...base, tempoEstimado: '5' }).success, false);
+  assert.equal(triagemSchema.safeParse({ ...base, status: 'inventado' }).success, false);
+});
+
+test('bloqueio monta o período no fuso da oficina e exige fim depois do início', async () => {
+  const { bloqueioSchema } = await import('../../src/lib/validacao.ts');
+  const ok = bloqueioSchema.parse({ data: '2026-10-13', inicio: '08:00', fim: '12:30', recursoId: '', motivo: 'Feriado' });
+  assert.equal(ok.periodo, '[2026-10-13T08:00:00-03:00,2026-10-13T12:30:00-03:00)');
+  assert.equal(ok.recursoId, null);
+  assert.match(bloqueioSchema.safeParse({ data: '2026-10-13', inicio: '12:00', fim: '08:00', recursoId: '', motivo: 'Feriado' }).error!.issues[0].message, /fim/);
+});

@@ -34,3 +34,10 @@ export function somarDias(ymd: string, n: number): string {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
+
+export const PRIORIDADE: Record<string, string> = { baixa: 'Baixa', media: 'Média', alta: 'Alta', urgente: 'Urgente' };
+export const PESO_PRIORIDADE: Record<string, number> = { urgente: 4, alta: 3, media: 2, baixa: 1 };
+export const telefoneBR = (t: string) =>
+  t.length === 11 ? `(${t.slice(0, 2)}) ${t.slice(2, 7)}-${t.slice(7)}` : `(${t.slice(0, 2)}) ${t.slice(2, 6)}-${t.slice(6)}`;
+// limites de um dia no fuso da oficina, para filtrar por data
+export const inicioDoDia = (ymd: string) => `${ymd}T00:00:00-03:00`;

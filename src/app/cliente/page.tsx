@@ -11,6 +11,10 @@ export default async function AreaCliente({ searchParams }: { searchParams: Prom
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/entrar');
 
+  // a equipe da oficina usa o painel, não a área do cliente
+  const { data: perfil } = await supabase.from('perfis').select('papel').eq('id', user.id).maybeSingle();
+  if (perfil && perfil.papel !== 'cliente') redirect('/painel');
+
   const { data: cliente } = await supabase.from('clientes').select('id, nome_completo').eq('perfil_id', user.id).maybeSingle();
   if (!cliente) {
     const sp = await searchParams;
