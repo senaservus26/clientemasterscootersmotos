@@ -121,7 +121,8 @@ end $$;
 revoke execute on function app.exigir_admin, app.proteger_ultimo_admin from public;
 grant execute on function app.exigir_admin to authenticated;
 revoke execute on function public.listar_equipe, public.definir_perfil_equipe, public.definir_acesso,
-  public.gerar_acesso_protocolo, public.revogar_acesso_protocolo, public.consultar_protocolo from public;
+  public.gerar_acesso_protocolo, public.revogar_acesso_protocolo, public.consultar_protocolo from public, anon;
+-- no Supabase, funções novas do esquema public já nascem liberadas para anon; por isso o revoke explícito acima
 grant execute on function public.listar_equipe, public.definir_perfil_equipe, public.definir_acesso,
   public.gerar_acesso_protocolo, public.revogar_acesso_protocolo to authenticated;
 grant execute on function public.consultar_protocolo to anon, authenticated;

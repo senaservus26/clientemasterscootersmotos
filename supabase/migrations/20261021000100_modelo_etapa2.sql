@@ -396,7 +396,8 @@ create policy equipe on public.mensagens for select using (app.eh_equipe());
 
 -- leitura pelo RLS; escrita só pelas funções das próximas etapas (exceto catálogo de mensagens, do admin)
 revoke all on public.acessos_protocolo, public.anexos, public.triagens, public.lista_espera, public.ordens_servico,
-  public.aprovacoes, public.os_itens, public.pagamentos, public.recomendacoes, public.modelos_mensagem, public.mensagens
+  public.aprovacoes, public.os_itens, public.pagamentos, public.recomendacoes, public.modelos_mensagem, public.mensagens,
+  public.os_financeiro, public.linha_do_tempo
   from anon, authenticated;
 grant select on public.anexos, public.triagens, public.lista_espera, public.ordens_servico, public.aprovacoes,
   public.os_itens, public.pagamentos, public.recomendacoes, public.modelos_mensagem, public.mensagens,
