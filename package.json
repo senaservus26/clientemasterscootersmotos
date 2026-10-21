@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run test:unit && npm run test:db",
     "test:unit": "node --test --experimental-strip-types \"tests/unit/*.test.ts\"",
-    "test:db": "node --test \"tests/db/*.test.mjs\""
+    "test:db": "node --test --test-concurrency=1 \"tests/db/*.test.mjs\""
   },
   "dependencies": {
     "@supabase/ssr": "0.7.0",
