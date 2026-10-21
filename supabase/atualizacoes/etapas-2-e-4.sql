@@ -563,4 +563,12 @@ grant execute on function public.listar_equipe, public.definir_perfil_equipe, pu
   public.gerar_acesso_protocolo, public.revogar_acesso_protocolo to authenticated;
 grant execute on function public.consultar_protocolo to anon, authenticated;
 
+-- alerta do Supabase: funções auxiliares com search_path fixo, como as demais
+alter function app.erro(text) set search_path = '';
+alter function app.tocar_atualizado_em() set search_path = '';
+alter function app.gerar_protocolo() set search_path = '';
+alter function app.gerar_numero_os() set search_path = '';
+alter function app.proteger_item_os() set search_path = '';
+alter function app.item_novo_proposto() set search_path = '';
+
 commit;
