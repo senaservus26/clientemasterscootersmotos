@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { equipeAtual } from '@/lib/equipe';
 import { PESO_PRIORIDADE, PRIORIDADE, STATUS, classeStatus, dataHora, hojeSP, inicioDoDia, somarDias } from '@/lib/rotulos';
-import { NavPainel } from './navegacao';
+import { Aviso, NavPainel } from './navegacao';
 
 export const metadata = { title: 'Painel da oficina' };
 
@@ -21,7 +21,7 @@ type Linha = {
 };
 
 export default async function Painel({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const { supabase, nome } = await equipeAtual();
+  const { supabase, nome, admin } = await equipeAtual();
   const sp = await searchParams;
   const filtro: Filtro = sp.f && sp.f in FILTROS ? (sp.f as Filtro) : 'abertas';
   const hoje = hojeSP();
@@ -48,7 +48,8 @@ export default async function Painel({ searchParams }: { searchParams: Promise<R
 
   return (
     <div className="wrap page">
-      <NavPainel atual="solicitacoes" nome={nome} />
+      <NavPainel atual="solicitacoes" nome={nome} admin={admin} />
+      <Aviso erro={sp.erro} />
       <div className="kpis">
         <div className="kpi"><p className="label">Novas para avaliar</p><p className="v">{novas.count ?? 0}</p></div>
         <div className="kpi"><p className="label">Esperando horário</p><p className="v">{agendar.count ?? 0}</p></div>

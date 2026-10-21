@@ -177,3 +177,11 @@ dialog::backdrop{background:rgb(0 0 0 / .45)}
 .nav-links a{padding:6px 12px;border-radius:6px;text-decoration:none;color:var(--muted);font-weight:600;font-size:.9rem}
 .nav-links a:hover{color:var(--ink)}
 form.inline{display:inline}
+
+/* Etapa 4: equipe e acompanhamento sem login */
+.tabela{width:100%;border-collapse:collapse;font-size:.92rem}
+.tabela th{text-align:left;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+.tabela td{padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+.tabela tr.muted td{color:var(--muted)}
+@media (max-width:640px){.tabela thead{display:none}.tabela tr{display:block;border-bottom:1px solid var(--line);padding:6px 0}.tabela td{display:block;border:0;padding:4px 0}}
+.link-gerado{font-family:var(--f-mono,monospace);font-size:.8rem;word-break:break-all;user-select:all}

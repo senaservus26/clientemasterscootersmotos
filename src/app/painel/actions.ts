@@ -1,9 +1,10 @@
 'use server';
 import { revalidatePath } from 'next/cache';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { equipeAtual } from '@/lib/equipe';
+import { equipeAtual, exigirAdmin } from '@/lib/equipe';
 import { mensagemDoBanco } from '@/lib/erros';
-import { bloqueioSchema, cancelamentoSchema, confirmacaoSchema, primeiroErro, triagemSchema } from '@/lib/validacao';
+import { acessoSchema, bloqueioSchema, cancelamentoSchema, confirmacaoSchema, membroEquipeSchema, primeiroErro, triagemSchema } from '@/lib/validacao';
 
 const voltar = (destino: string, chave: 'ok' | 'erro', texto: string): never =>
   redirect(`${destino}${destino.includes('?') ? '&' : '?'}${chave}=${encodeURIComponent(texto)}`);
@@ -79,4 +80,52 @@ export async function removerBloqueio(form: FormData): Promise<void> {
   revalidatePath('/painel/agenda');
   if (error) voltar(destino, 'erro', mensagemDoBanco(error));
   voltar(destino, 'ok', 'Bloqueio removido.');
+}
+
+// ------------------------------------------------------------ equipe (somente administrador)
+export async function salvarMembroEquipe(form: FormData): Promise<void> {
+  const { supabase } = await exigirAdmin();
+  const destino = '/painel/equipe';
+  const dados = membroEquipeSchema.safeParse({ email: form.get('email'), nome: form.get('nome'), papel: form.get('papel') });
+  if (!dados.success) voltar(destino, 'erro', primeiroErro(dados.error));
+  const d = dados.data!;
+  const { error } = await supabase.rpc('definir_perfil_equipe', { p_email: d.email, p_papel: d.papel, p_nome: d.nome });
+  revalidatePath(destino);
+  if (error) voltar(destino, 'erro', mensagemDoBanco(error));
+  voltar(destino, 'ok', d.papel === 'cliente' ? `${d.nome} saiu da equipe.` : `Perfil de ${d.nome} salvo.`);
+}
+
+export async function alterarAcesso(form: FormData): Promise<void> {
+  const { supabase } = await exigirAdmin();
+  const destino = '/painel/equipe';
+  const dados = acessoSchema.safeParse({ perfilId: form.get('perfilId'), ativo: form.get('ativo') });
+  if (!dados.success) voltar(destino, 'erro', 'Pedido inválido.');
+  const { error } = await supabase.rpc('definir_acesso', { p_perfil: dados.data!.perfilId, p_ativo: dados.data!.ativo });
+  revalidatePath(destino);
+  if (error) voltar(destino, 'erro', mensagemDoBanco(error));
+  voltar(destino, 'ok', dados.data!.ativo ? 'Acesso reativado.' : 'Acesso desativado. A pessoa perde o acesso na próxima página que abrir.');
+}
+
+// ------------------------------------------------------------ link de acompanhamento sem login
+// O link aparece uma única vez para a equipe copiar: vai num cookie curto, nunca na URL nem no banco.
+export async function gerarLinkAcompanhamento(form: FormData): Promise<void> {
+  const { supabase } = await equipeAtual();
+  const id = String(form.get('solicitacaoId') ?? '');
+  if (!confirmacaoSchema.shape.solicitacaoId.safeParse(id).success) redirect('/painel');
+  const destino = `/painel/solicitacoes/${id}`;
+  const { data, error } = await supabase.rpc('gerar_acesso_protocolo', { p_solicitacao: id });
+  if (error || typeof data !== 'string') voltar(destino, 'erro', error ? mensagemDoBanco(error) : 'Não foi possível gerar o link.');
+  (await cookies()).set(`ms_link_${id}`, data as string, { httpOnly: true, secure: true, sameSite: 'strict', maxAge: 300, path: destino });
+  voltar(destino, 'ok', 'Link gerado. Copie e envie ao cliente; ele vale por 30 dias e o anterior deixou de funcionar.');
+}
+
+export async function revogarLinkAcompanhamento(form: FormData): Promise<void> {
+  const { supabase } = await equipeAtual();
+  const id = String(form.get('solicitacaoId') ?? '');
+  if (!confirmacaoSchema.shape.solicitacaoId.safeParse(id).success) redirect('/painel');
+  const destino = `/painel/solicitacoes/${id}`;
+  const { error } = await supabase.rpc('revogar_acesso_protocolo', { p_solicitacao: id });
+  (await cookies()).delete({ name: `ms_link_${id}`, path: destino });
+  if (error) voltar(destino, 'erro', mensagemDoBanco(error));
+  voltar(destino, 'ok', 'Link de acompanhamento desativado.');
 }

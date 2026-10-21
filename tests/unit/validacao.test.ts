@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cadastroSchema, veiculoSchema, solicitacaoSchema } from '../../src/lib/validacao.ts';
+import { acessoSchema, cadastroSchema, membroEquipeSchema, solicitacaoSchema, tokenProtocoloSchema, veiculoSchema } from '../../src/lib/validacao.ts';
 import { mensagemDoBanco } from '../../src/lib/erros.ts';
 
 const cadastroBase = { nome: 'Ana Teste', telefone: '(13) 91234-5678', email: '', preferencia: 'whatsapp', aceitePrivacidade: true, aceiteLembretes: false, origem: 'instagram' };
@@ -54,4 +54,18 @@ test('bloqueio monta o período no fuso da oficina e exige fim depois do início
   assert.equal(ok.periodo, '[2026-10-13T08:00:00-03:00,2026-10-13T12:30:00-03:00)');
   assert.equal(ok.recursoId, null);
   assert.match(bloqueioSchema.safeParse({ data: '2026-10-13', inicio: '12:00', fim: '08:00', recursoId: '', motivo: 'Feriado' }).error!.issues[0].message, /fim/);
+});
+
+test('equipe: e-mail normalizado, perfil só entre os permitidos', () => {
+  const r = membroEquipeSchema.parse({ email: ' Carla@Oficina.com ', nome: 'Carla', papel: 'atendente' });
+  assert.equal(r.email, 'carla@oficina.com');
+  assert.equal(membroEquipeSchema.safeParse({ email: 'carla@oficina.com', nome: 'Carla', papel: 'dono' }).success, false);
+  assert.equal(membroEquipeSchema.safeParse({ email: 'carla', nome: 'Carla', papel: 'admin' }).success, false);
+  assert.equal(acessoSchema.parse({ perfilId: '6f1c2a3b-4d5e-4f60-8a7b-9c0d1e2f3a4b', ativo: 'nao' }).ativo, false);
+});
+
+test('link de acompanhamento aceita só token de 64 caracteres hexadecimais', () => {
+  assert.equal(tokenProtocoloSchema.safeParse('a'.repeat(64)).success, true);
+  assert.equal(tokenProtocoloSchema.safeParse('A'.repeat(64)).success, false);
+  assert.equal(tokenProtocoloSchema.safeParse('../../etc').success, false);
 });

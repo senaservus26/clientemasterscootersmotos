@@ -96,3 +96,17 @@ export const bloqueioSchema = z.object({
     recursoId: b.recursoId, motivo: b.motivo, data: b.data,
     periodo: `[${b.data}T${b.inicio}:00-03:00,${b.data}T${b.fim}:00-03:00)`,
   }));
+
+export const membroEquipeSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Informe o e-mail que a pessoa usou para entrar.'),
+  nome: z.string().trim().min(2, 'Informe o nome da pessoa.').max(120),
+  papel: z.enum(['admin', 'atendente', 'especialista', 'cliente']),
+});
+
+export const acessoSchema = z.object({
+  perfilId: z.string().uuid(),
+  ativo: z.enum(['sim', 'nao']).transform((v) => v === 'sim'),
+});
+
+// o link de acompanhamento leva só o token; o resto é validado no banco
+export const tokenProtocoloSchema = z.string().regex(/^[0-9a-f]{64}$/);
