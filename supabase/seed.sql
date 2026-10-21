@@ -24,3 +24,19 @@ insert into public.sintomas (slug, texto, risco) values
   ('ruido', 'Barulho diferente no motor ou na transmissão', false),
   ('falhando', 'Falhando ou engasgando', false),
   ('consumo-alto', 'Consumo de combustível alto', false);
+
+-- Etapa 2 (premissas ilustrativas, a validar com a oficina após a contratação)
+-- Revisão e serviços de motor podem ser marcados direto; os demais passam pela avaliação do especialista.
+update public.servicos set exige_avaliacao = false where slug in ('revisao-geral', 'motor');
+update public.sintomas set classe_sugerida = 'prioritaria' where slug in ('nao-liga', 'falhando');
+update public.sintomas set classe_sugerida = 'programavel' where slug in ('luz-painel', 'ruido', 'consumo-alto');
+
+-- Textos ilustrativos. No WhatsApp, cada modelo precisa de aprovação da Meta antes do primeiro envio real.
+insert into public.modelos_mensagem (slug, motivo, canal, texto) values
+  ('recebimento', 'recebimento', 'whatsapp', 'Olá, {{nome}}! Recebemos sua solicitação {{protocolo}}. O especialista vai avaliar e retornamos por aqui.'),
+  ('agendamento', 'agendamento', 'whatsapp', 'Seu horário na Master Scooter está confirmado para {{data}} às {{hora}}. Protocolo {{protocolo}}.'),
+  ('lembrete_vespera', 'lembrete_atendimento', 'whatsapp', 'Lembrete: amanhã, {{data}} às {{hora}}, sua moto é esperada na Master Scooter. Responda 1 para confirmar ou 2 para remarcar.'),
+  ('mudanca_status', 'mudanca_status', 'whatsapp', 'Atualização do protocolo {{protocolo}}: {{status}}.'),
+  ('orcamento', 'mudanca_status', 'whatsapp', 'O orçamento da sua moto ({{protocolo}}) está pronto: {{valor}}. Veja os itens e aprove pelo link: {{link}}'),
+  ('conclusao', 'conclusao', 'whatsapp', 'Sua moto está pronta para retirada! Protocolo {{protocolo}}. Atendemos até {{fechamento}}.'),
+  ('lembrete_preventivo', 'lembrete_preventivo', 'whatsapp', 'Olá, {{nome}}! Pela última visita, está chegando a hora de: {{recomendacao}}. Quer agendar?');

@@ -15,7 +15,8 @@ Stack: Next.js 15 (App Router) + TypeScript, Supabase (PostgreSQL, login e armaz
 | Área do cliente: cadastro, scooter, solicitação, protocolo, andamento, escolha de horário | Código pronto e compilando; depende do projeto Supabase |
 | Painel da oficina (`/painel`): fila por prioridade e risco, triagem, notas internas, confirmação e cancelamento de horário | Código pronto e compilando; depende do projeto Supabase |
 | Agenda do dia por box, ocupação, preferências dos clientes e bloqueios de horário (`/painel/agenda`) | Código pronto e compilando; depende do projeto Supabase |
-| Fotos e vídeos na solicitação | Próxima entrega, com armazenamento privado |
+| Modelo da Etapa 2: ordem de serviço, orçamento por itens, aprovação do cliente, pagamento, triagem com prioridade sugerida e confirmada, lista de espera, recomendações, linha do tempo da moto, fila de mensagens com modo de teste (`supabase/migrations/20261021000100_modelo_etapa2.sql`) | Estrutura pronta e testada (ver `tests/db/modelo.test.mjs`); ainda sem telas nem funções de gravação, que chegam nas Etapas 4 a 10. Não aplicado no Supabase publicado |
+| Fotos e vídeos na solicitação | Tabela de anexos pronta; envio com armazenamento privado na Etapa 5 |
 | WhatsApp | Entrega E6; nada integrado ainda |
 
 Os serviços e o horário vêm do Instagram @masterscootermotos e ainda precisam ser confirmados pela oficina. Durações, boxes, capacidade diária e lista de sintomas de risco são estimativas da Sena SERVUS (ver `supabase/seed.sql`).
@@ -40,7 +41,7 @@ npm ci
 TEST_PG_HOST=localhost TEST_PG_PORT=5432 TEST_PG_USER=postgres TEST_PG_PASSWORD=postgres npm test
 ```
 
-O teste cria e apaga o banco `masterscooter_teste`. O arquivo `tests/db/supabase-shim.sql` simula os papéis e a função `auth.uid()` do Supabase; ele não é aplicado no Supabase real. O GitHub Actions roda os mesmos testes a cada envio (`.github/workflows/testes.yml`).
+Os testes criam e apagam os bancos `masterscooter_teste` e `masterscooter_modelo`. O arquivo `tests/db/supabase-shim.sql` simula os papéis e a função `auth.uid()` do Supabase; ele não é aplicado no Supabase real. O GitHub Actions roda os mesmos testes a cada envio (`.github/workflows/testes.yml`).
 
 ## Como colocar no ar
 
