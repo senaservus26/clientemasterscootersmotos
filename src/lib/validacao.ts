@@ -16,6 +16,7 @@ export const cadastroSchema = z.object({
   preferencia: z.enum(['whatsapp', 'email', 'telefone']),
   aceitePrivacidade: z.literal(true, { errorMap: () => ({ message: 'É preciso concordar com o aviso de privacidade.' }) }),
   aceiteLembretes: z.boolean(),
+  aceiteMarketing: z.boolean().default(false),
   origem: z.enum(['instagram', 'anuncio', 'google', 'indicacao', 'whatsapp', 'site', 'outro']),
 });
 
@@ -30,7 +31,11 @@ export const veiculoSchema = z.object({
     .refine((v) => !v || /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(v), 'Placa inválida. Use o formato ABC1D23 ou ABC1234.')
     .transform((v) => (v ? v : undefined)),
   ultimaManutencao: z.union([z.literal(''), z.string().date()]).optional().transform((v) => (v ? v : undefined)),
-});
+  anoModelo: z.union([z.literal(''), z.coerce.number().int()]).optional().transform((v) => (v === '' || v === undefined ? undefined : v)),
+  historico: textoOpcional(2000),
+  observacoes: textoOpcional(1000),
+}).refine((v) => v.anoModelo === undefined || v.anoModelo === v.ano || v.anoModelo === v.ano + 1,
+  { message: 'O ano do modelo é o mesmo da fabricação ou o seguinte.', path: ['anoModelo'] });
 
 export const solicitacaoSchema = z.object({
   veiculoId: z.string().uuid('Escolha a scooter.'),
@@ -110,3 +115,45 @@ export const acessoSchema = z.object({
 
 // o link de acompanhamento leva só o token; o resto é validado no banco
 export const tokenProtocoloSchema = z.string().regex(/^[0-9a-f]{64}$/);
+
+// ---------------------------------------------------------------- Etapa 5: cadastro pela equipe e anexos
+export const CANAIS_EQUIPE = { balcao: 'Balcão', telefone: 'Telefone', whatsapp: 'WhatsApp' } as const;
+const canalEquipe = z.enum(['balcao', 'telefone', 'whatsapp'], { errorMap: () => ({ message: 'Informe por onde o cliente chegou.' }) });
+
+export const clienteEquipeSchema = z.object({
+  nome: z.string().trim().min(3, 'Informe nome e sobrenome.').max(120),
+  telefone: z.string().transform(somenteDigitos)
+    .refine((v) => v.length === 10 || v.length === 11, 'Informe o telefone com DDD, por exemplo (13) 91234-5678.'),
+  email: z.union([z.literal(''), z.string().trim().email('O e-mail parece incompleto.')]).optional()
+    .transform((v) => (v ? v : undefined)),
+  preferencia: z.enum(['whatsapp', 'email', 'telefone']),
+  canal: canalEquipe,
+  origem: z.enum(['instagram', 'anuncio', 'google', 'indicacao', 'whatsapp', 'site', 'outro']),
+  cientePrivacidade: z.literal(true, { errorMap: () => ({ message: 'Confirme que o cliente foi informado sobre o aviso de privacidade.' }) }),
+  aceiteLembretes: z.boolean(),
+  aceiteMarketing: z.boolean(),
+});
+
+export const preferenciasSchema = z.object({
+  lembretes: z.boolean(),
+  marketing: z.boolean(),
+});
+
+export const canalSchema = canalEquipe;
+
+export const vinculoSchema = z.object({
+  clienteId: z.string().uuid(),
+  email: z.string().trim().toLowerCase().email('Informe o e-mail que o cliente usou para entrar no site.'),
+});
+
+export const LIMITE_ANEXO_BYTES = 50 * 1024 * 1024;
+export const EXTENSOES_ANEXO: Record<string, 'foto' | 'video'> = {
+  jpg: 'foto', jpeg: 'foto', png: 'foto', webp: 'foto', heic: 'foto', mp4: 'video', mov: 'video',
+};
+
+export const anexoSchema = z.object({
+  solicitacaoId: z.string().uuid(),
+  caminho: z.string().regex(/^[0-9a-f-]{36}\/[a-z0-9-]+\.(jpg|jpeg|png|webp|heic|mp4|mov)$/),
+  tipo: z.enum(['foto', 'video']),
+  tamanho: z.coerce.number().int().min(1).max(LIMITE_ANEXO_BYTES, 'Arquivo acima de 50 MB.'),
+}).refine((a) => a.caminho.startsWith(a.solicitacaoId + '/'), { message: 'Arquivo inválido.' });

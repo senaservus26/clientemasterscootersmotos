@@ -2,16 +2,16 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { supabaseServidor } from '@/lib/supabase/server';
+import { argumentosVeiculo, dadosVeiculo } from '@/lib/veiculo';
 import { mensagemDoBanco } from '@/lib/erros';
-import { cadastroSchema, veiculoSchema, solicitacaoSchema, preferenciaSchema, primeiroErro, type Resultado } from '@/lib/validacao';
-
-const VERSAO_PRIVACIDADE = 'privacidade-2026-10-rascunho';
+import { cadastroSchema, veiculoSchema, solicitacaoSchema, preferenciaSchema, preferenciasSchema, primeiroErro, type Resultado } from '@/lib/validacao';
+import { VERSAO_PRIVACIDADE } from '@/lib/textos';
 
 export async function registrarCliente(_: Resultado | null, form: FormData): Promise<Resultado> {
   const dados = cadastroSchema.safeParse({
     nome: form.get('nome'), telefone: form.get('telefone'), email: form.get('email') ?? '',
     preferencia: form.get('preferencia'), aceitePrivacidade: form.get('aceitePrivacidade') === 'on',
-    aceiteLembretes: form.get('aceiteLembretes') === 'on', origem: form.get('origem'),
+    aceiteLembretes: form.get('aceiteLembretes') === 'on', aceiteMarketing: form.get('aceiteMarketing') === 'on', origem: form.get('origem'),
   });
   if (!dados.success) return { ok: false, erro: primeiroErro(dados.error) };
   const d = dados.data;
@@ -24,21 +24,19 @@ export async function registrarCliente(_: Resultado | null, form: FormData): Pro
     p_versao_texto: VERSAO_PRIVACIDADE, p_origem_canal: d.origem, p_utm: utm,
   });
   if (error) return { ok: false, erro: mensagemDoBanco(error) };
+  // divulgação é um consentimento separado e opcional; só registra quando o cliente marcou
+  if (d.aceiteMarketing) {
+    await supabase.rpc('definir_consentimento', { p_tipo: 'marketing', p_aceito: true, p_versao_texto: VERSAO_PRIVACIDADE });
+  }
   revalidatePath('/cliente');
   return { ok: true, mensagem: 'Cadastro criado. Agora cadastre sua scooter.' };
 }
 
 export async function cadastrarVeiculo(_: Resultado | null, form: FormData): Promise<Resultado> {
-  const dados = veiculoSchema.safeParse({
-    marca: form.get('marca'), modelo: form.get('modelo'), ano: form.get('ano'), quilometragem: form.get('quilometragem'),
-    placa: form.get('placa') || undefined, ultimaManutencao: form.get('ultimaManutencao') ?? '',
-  });
+  const dados = veiculoSchema.safeParse(dadosVeiculo(form));
   if (!dados.success) return { ok: false, erro: primeiroErro(dados.error) };
-  const d = dados.data;
   const supabase = await supabaseServidor();
-  const { error } = await supabase.rpc('cadastrar_veiculo', {
-    p_marca: d.marca, p_modelo: d.modelo, p_ano: d.ano, p_km: d.quilometragem, p_placa: d.placa ?? null, p_ultima: d.ultimaManutencao ?? null,
-  });
+  const { error } = await supabase.rpc('salvar_veiculo', argumentosVeiculo(null, dados.data));
   if (error) return { ok: false, erro: mensagemDoBanco(error) };
   revalidatePath('/cliente');
   return { ok: true, mensagem: 'Scooter cadastrada.' };
@@ -72,4 +70,15 @@ export async function indicarPreferencia(form: FormData): Promise<void> {
   revalidatePath(destino);
   if (error) redirect(`${destino}?erro=${encodeURIComponent(mensagemDoBanco(error))}`);
   redirect(`${destino}?preferencia=1`);
+}
+
+export async function salvarPreferencias(_: Resultado | null, form: FormData): Promise<Resultado> {
+  const d = preferenciasSchema.parse({ lembretes: form.get('lembretes') === 'on', marketing: form.get('marketing') === 'on' });
+  const supabase = await supabaseServidor();
+  for (const [tipo, aceito] of [['lembretes', d.lembretes], ['marketing', d.marketing]] as const) {
+    const { error } = await supabase.rpc('definir_consentimento', { p_tipo: tipo, p_aceito: aceito, p_versao_texto: VERSAO_PRIVACIDADE });
+    if (error) return { ok: false, erro: mensagemDoBanco(error) };
+  }
+  revalidatePath('/cliente');
+  return { ok: true, mensagem: 'Preferências salvas.' };
 }

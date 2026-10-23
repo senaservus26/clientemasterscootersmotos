@@ -4,7 +4,12 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { equipeAtual, exigirAdmin } from '@/lib/equipe';
 import { mensagemDoBanco } from '@/lib/erros';
-import { acessoSchema, bloqueioSchema, cancelamentoSchema, confirmacaoSchema, membroEquipeSchema, primeiroErro, triagemSchema } from '@/lib/validacao';
+import {
+  acessoSchema, bloqueioSchema, cancelamentoSchema, canalSchema, clienteEquipeSchema, confirmacaoSchema, membroEquipeSchema,
+  preferenciasSchema, primeiroErro, solicitacaoSchema, triagemSchema, veiculoSchema, vinculoSchema, type Resultado,
+} from '@/lib/validacao';
+import { VERSAO_PRIVACIDADE } from '@/lib/textos';
+import { argumentosVeiculo, dadosVeiculo } from '@/lib/veiculo';
 
 const voltar = (destino: string, chave: 'ok' | 'erro', texto: string): never =>
   redirect(`${destino}${destino.includes('?') ? '&' : '?'}${chave}=${encodeURIComponent(texto)}`);
@@ -128,4 +133,89 @@ export async function revogarLinkAcompanhamento(form: FormData): Promise<void> {
   (await cookies()).delete({ name: `ms_link_${id}`, path: destino });
   if (error) voltar(destino, 'erro', mensagemDoBanco(error));
   voltar(destino, 'ok', 'Link de acompanhamento desativado.');
+}
+
+// ------------------------------------------------------------ clientes cadastrados pela equipe (balcão, telefone, WhatsApp)
+const idValido = (v: FormDataEntryValue | null) => confirmacaoSchema.shape.solicitacaoId.safeParse(String(v ?? '')).success;
+
+export async function cadastrarClienteEquipe(_: Resultado | null, form: FormData): Promise<Resultado> {
+  const { supabase } = await equipeAtual();
+  const dados = clienteEquipeSchema.safeParse({
+    nome: form.get('nome'), telefone: form.get('telefone'), email: form.get('email') ?? '', preferencia: form.get('preferencia'),
+    canal: form.get('canal'), origem: form.get('origem'), cientePrivacidade: form.get('cientePrivacidade') === 'on',
+    aceiteLembretes: form.get('aceiteLembretes') === 'on', aceiteMarketing: form.get('aceiteMarketing') === 'on',
+  });
+  if (!dados.success) return { ok: false, erro: primeiroErro(dados.error) };
+  const d = dados.data;
+  const { data, error } = await supabase.rpc('cadastrar_cliente_equipe', {
+    p_nome: d.nome, p_telefone: d.telefone, p_email: d.email ?? null, p_preferencia: d.preferencia, p_canal: d.canal,
+    p_origem_canal: d.origem, p_ciente_privacidade: d.cientePrivacidade, p_aceite_lembretes: d.aceiteLembretes,
+    p_aceite_marketing: d.aceiteMarketing, p_versao_texto: VERSAO_PRIVACIDADE,
+  });
+  if (error || typeof data !== 'string') return { ok: false, erro: mensagemDoBanco(error) };
+  revalidatePath('/painel/clientes');
+  redirect(`/painel/clientes/${data}?ok=${encodeURIComponent('Cliente cadastrado. Agora cadastre a moto.')}`);
+}
+
+export async function salvarVeiculoEquipe(_: Resultado | null, form: FormData): Promise<Resultado> {
+  const { supabase } = await equipeAtual();
+  const clienteId = String(form.get('clienteId') ?? '');
+  if (!idValido(clienteId)) return { ok: false, erro: 'Cliente não encontrado.' };
+  const dados = veiculoSchema.safeParse(dadosVeiculo(form));
+  if (!dados.success) return { ok: false, erro: primeiroErro(dados.error) };
+  const { error } = await supabase.rpc('salvar_veiculo', argumentosVeiculo(clienteId, dados.data));
+  if (error) return { ok: false, erro: mensagemDoBanco(error) };
+  revalidatePath(`/painel/clientes/${clienteId}`);
+  return { ok: true, mensagem: 'Moto cadastrada.' };
+}
+
+export async function abrirSolicitacaoEquipe(_: Resultado | null, form: FormData): Promise<Resultado> {
+  const { supabase } = await equipeAtual();
+  const clienteId = String(form.get('clienteId') ?? '');
+  if (!idValido(clienteId)) return { ok: false, erro: 'Cliente não encontrado.' };
+  const canal = canalSchema.safeParse(form.get('canal'));
+  if (!canal.success) return { ok: false, erro: primeiroErro(canal.error) };
+  const dados = solicitacaoSchema.safeParse({
+    veiculoId: form.get('veiculoId'), servico: form.get('servico'), descricao: form.get('descricao'),
+    sintomas: form.getAll('sintomas').map(String), inicioProblema: form.get('inicioProblema') ?? '',
+    quilometragem: form.get('quilometragem'), disponibilidade: form.get('disponibilidade') ?? '',
+  });
+  if (!dados.success) return { ok: false, erro: primeiroErro(dados.error) };
+  const d = dados.data;
+  const { data, error } = await supabase.rpc('abrir_solicitacao_equipe', {
+    p_cliente: clienteId, p_veiculo: d.veiculoId, p_servico_slug: d.servico, p_descricao: d.descricao, p_sintomas: d.sintomas,
+    p_inicio_problema: d.inicioProblema ?? null, p_km: d.quilometragem, p_disponibilidade: d.disponibilidade ?? null, p_canal: canal.data,
+  });
+  if (error || !data?.[0]) return { ok: false, erro: mensagemDoBanco(error) };
+  revalidatePath('/painel');
+  redirect(`/painel/solicitacoes/${data[0].id}?ok=${encodeURIComponent(`Solicitação ${data[0].protocolo} registrada.`)}`);
+}
+
+export async function salvarPreferenciasEquipe(form: FormData): Promise<void> {
+  const { supabase } = await equipeAtual();
+  const clienteId = String(form.get('clienteId') ?? '');
+  if (!idValido(clienteId)) redirect('/painel/clientes');
+  const destino = `/painel/clientes/${clienteId}`;
+  const canal = canalSchema.safeParse(form.get('canal'));
+  if (!canal.success) voltar(destino, 'erro', primeiroErro(canal.error));
+  const d = preferenciasSchema.parse({ lembretes: form.get('lembretes') === 'on', marketing: form.get('marketing') === 'on' });
+  for (const [tipo, aceito] of [['lembretes', d.lembretes], ['marketing', d.marketing]] as const) {
+    const { error } = await supabase.rpc('definir_consentimento', {
+      p_tipo: tipo, p_aceito: aceito, p_versao_texto: VERSAO_PRIVACIDADE, p_cliente: clienteId, p_canal: canal.data,
+    });
+    if (error) voltar(destino, 'erro', mensagemDoBanco(error));
+  }
+  revalidatePath(destino);
+  voltar(destino, 'ok', 'Preferências do cliente registradas.');
+}
+
+export async function vincularLoginCliente(form: FormData): Promise<void> {
+  const { supabase } = await equipeAtual();
+  const dados = vinculoSchema.safeParse({ clienteId: form.get('clienteId'), email: form.get('email') });
+  const destino = `/painel/clientes/${String(form.get('clienteId') ?? '')}`;
+  if (!dados.success) voltar(idValido(form.get('clienteId')) ? destino : '/painel/clientes', 'erro', primeiroErro(dados.error));
+  const { error } = await supabase.rpc('vincular_login_cliente', { p_cliente: dados.data!.clienteId, p_email: dados.data!.email });
+  revalidatePath(destino);
+  if (error) voltar(destino, 'erro', mensagemDoBanco(error));
+  voltar(destino, 'ok', 'Login ligado. O cliente já vê os pedidos dele na área do cliente.');
 }

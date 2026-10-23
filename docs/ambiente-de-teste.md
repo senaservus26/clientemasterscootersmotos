@@ -5,7 +5,7 @@ O sistema usa dois projetos Supabase separados. O de **teste** recebe toda mudan
 ## 1. Criar o projeto de teste no Supabase (uma vez)
 
 1. Em supabase.com, crie um projeto novo chamado `masterscooter-teste`, região South America (São Paulo), plano gratuito.
-2. No SQL Editor do projeto novo, rode `supabase-instalar.sql` (instalação inicial) e em seguida `supabase/atualizacoes/etapas-2-e-4.sql`.
+2. No SQL Editor do projeto novo, rode `supabase-instalar.sql` (instalação inicial) e em seguida `supabase/atualizacoes/etapas-2-a-5.sql`.
 3. Em Authentication > Email Templates > Magic Link, inclua `{{ .Token }}` no texto, igual à produção.
 4. Em Authentication > URL Configuration, informe o endereço de prévia da Vercel (passo 2) como Site URL.
 
@@ -30,7 +30,7 @@ Para testar os outros perfis, use outros e-mails (por exemplo um alias `seu+aten
 Só depois de aprovar no teste:
 
 1. **Backup**: no Supabase de produção, Database > Backups. No plano Pro há backup diário; antes de atualizar, confirme que existe um de hoje. No plano gratuito, exporte pelo terminal com `supabase db dump -f backup.sql` (Supabase CLI) e guarde o arquivo fora do computador.
-2. Rode `supabase/atualizacoes/etapas-2-e-4.sql` no SQL Editor da produção. Se aparecer qualquer erro, nada foi alterado: copie a mensagem e envie à Sena SERVUS.
+2. Rode `supabase/atualizacoes/etapas-2-a-5.sql` no SQL Editor da produção. Se aparecer qualquer erro, nada foi alterado: copie a mensagem e envie à Sena SERVUS.
 3. Faça o merge do pull request. A Vercel publica o site novo.
 4. Confira: entrar como administrador, abrir Painel > Equipe, gerar um link de acompanhamento numa solicitação e abrir o link numa janela anônima.
 

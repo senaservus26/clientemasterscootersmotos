@@ -40,3 +40,7 @@ insert into public.modelos_mensagem (slug, motivo, canal, texto) values
   ('orcamento', 'mudanca_status', 'whatsapp', 'O orçamento da sua moto ({{protocolo}}) está pronto: {{valor}}. Veja os itens e aprove pelo link: {{link}}'),
   ('conclusao', 'conclusao', 'whatsapp', 'Sua moto está pronta para retirada! Protocolo {{protocolo}}. Atendemos até {{fechamento}}.'),
   ('lembrete_preventivo', 'lembrete_preventivo', 'whatsapp', 'Olá, {{nome}}! Pela última visita, está chegando a hora de: {{recomendacao}}. Quer agendar?');
+
+-- Etapa 5 (ilustrativo): vazamento entra na lista de perguntas estruturadas do pedido
+insert into public.sintomas (slug, texto, risco, classe_sugerida) values
+  ('vazamento-oleo', 'Vazamento de óleo ou outro fluido', false, 'prioritaria');

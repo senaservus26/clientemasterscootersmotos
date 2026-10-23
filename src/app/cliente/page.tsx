@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { supabaseServidor } from '@/lib/supabase/server';
 import { STATUS, classeStatus, dataHora } from '@/lib/rotulos';
-import { CadastroForm, VeiculoForm } from './formularios';
+import { CadastroForm, PreferenciasForm, VeiculoForm } from './formularios';
 
 export const metadata = { title: 'Área do cliente' };
 
@@ -23,10 +23,12 @@ export default async function AreaCliente({ searchParams }: { searchParams: Prom
     return <div className="wrap page" style={{ maxWidth: 760 }}><CadastroForm utm={utm} /></div>;
   }
 
-  const [{ data: veiculos }, { data: solicitacoes }] = await Promise.all([
-    supabase.from('veiculos').select('id, marca, modelo, ano, quilometragem').order('criado_em'),
+  const [{ data: veiculos }, { data: solicitacoes }, { data: consentimentos }] = await Promise.all([
+    supabase.from('veiculos').select('id, marca, modelo, ano, ano_modelo, quilometragem, placa').order('criado_em'),
     supabase.from('solicitacoes').select('id, protocolo, status, sintoma_risco, criado_em, veiculos(marca, modelo)').order('criado_em', { ascending: false }),
+    supabase.from('consentimentos_atuais').select('tipo, aceito'),
   ]);
+  const aceito = (tipo: string) => consentimentos?.some((c) => c.tipo === tipo && c.aceito) ?? false;
 
   return (
     <div className="wrap page">
@@ -55,9 +57,10 @@ export default async function AreaCliente({ searchParams }: { searchParams: Prom
         <div className="stack">
           <p className="label">Minhas scooters</p>
           {veiculos?.map((v) => (
-            <div key={v.id} className="panel"><h3>{v.marca} {v.modelo}</h3><p className="small mono">{v.ano} · {Number(v.quilometragem).toLocaleString('pt-BR')} km</p></div>
+            <div key={v.id} className="panel"><h3>{v.marca} {v.modelo}</h3><p className="small mono">{v.ano}{v.ano_modelo && v.ano_modelo !== v.ano ? `/${v.ano_modelo}` : ''} · {Number(v.quilometragem).toLocaleString('pt-BR')} km{v.placa ? ` · ${v.placa}` : ''}</p></div>
           ))}
           <VeiculoForm />
+          <PreferenciasForm lembretes={aceito('lembretes')} marketing={aceito('marketing')} />
         </div>
       </div>
     </div>

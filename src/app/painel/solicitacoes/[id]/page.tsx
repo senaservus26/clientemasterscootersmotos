@@ -5,6 +5,8 @@ import { equipeAtual } from '@/lib/equipe';
 import { PRIORIDADE, STATUS, classeStatus, dataHora, diaCurto, hojeSP, hora, somarDias, telefoneBR } from '@/lib/rotulos';
 import { cancelarAgendamento, confirmarAgendamento, gerarLinkAcompanhamento, revogarLinkAcompanhamento, salvarTriagem } from '../../actions';
 import { Aviso, NavPainel } from '../../navegacao';
+import { Anexos } from '@/components/anexos';
+import { listarAnexos } from '@/lib/anexos';
 
 export const metadata = { title: 'Solicitação · Painel' };
 
@@ -16,14 +18,14 @@ export default async function FichaSolicitacao({ params, searchParams }: Props) 
   const { supabase, nome, admin, definePrioridade } = await equipeAtual();
 
   const { data: s } = await supabase.from('solicitacoes')
-    .select('id, protocolo, status, prioridade, descricao, sintomas, inicio_problema, quilometragem, disponibilidade, sintoma_risco, tempo_estimado_min, preferencia_inicio, criado_em, clientes(nome_completo, telefone, email, preferencia_contato), veiculos(marca, modelo, ano, placa), servicos(slug, nome, duracao_minutos)')
+    .select('id, protocolo, status, prioridade, descricao, sintomas, inicio_problema, quilometragem, disponibilidade, sintoma_risco, tempo_estimado_min, preferencia_inicio, criado_em, clientes(id, nome_completo, telefone, email, preferencia_contato), veiculos(marca, modelo, ano, placa), servicos(slug, nome, duracao_minutos)')
     .eq('id', id).maybeSingle();
   if (!s) notFound();
-  const cliente = s.clientes as unknown as { nome_completo: string; telefone: string; email: string | null; preferencia_contato: string } | null;
+  const cliente = s.clientes as unknown as { id: string; nome_completo: string; telefone: string; email: string | null; preferencia_contato: string } | null;
   const veiculo = s.veiculos as unknown as { marca: string; modelo: string; ano: number; placa: string | null } | null;
   const servico = s.servicos as unknown as { slug: string; nome: string; duracao_minutos: number } | null;
 
-  const [{ data: eventos }, { data: notas }, { data: agendamento }, { data: servicos }, { data: sintomas }, { data: linkAtivo }] = await Promise.all([
+  const [{ data: eventos }, { data: notas }, { data: agendamento }, { data: servicos }, { data: sintomas }, { data: linkAtivo }, anexos] = await Promise.all([
     supabase.from('solicitacao_eventos').select('id, status_novo, descricao, visivel_cliente, criado_em').eq('solicitacao_id', id).order('id', { ascending: false }),
     supabase.from('notas_internas').select('id, texto, criado_em').eq('solicitacao_id', id).order('id', { ascending: false }),
     supabase.from('agendamentos').select('id, inicio, fim, recursos(nome)').eq('solicitacao_id', id).eq('estado', 'confirmado').maybeSingle(),
@@ -31,6 +33,7 @@ export default async function FichaSolicitacao({ params, searchParams }: Props) 
     supabase.from('sintomas').select('slug, texto, risco'),
     supabase.from('acessos_protocolo').select('expira_em').eq('solicitacao_id', id).is('revogado_em', null)
       .gt('expira_em', new Date().toISOString()).maybeSingle(),
+    listarAnexos(supabase, id),
   ]);
   // o link completo só existe aqui logo depois de gerado (cookie de 5 minutos); o banco guarda só o hash
   const tokenGerado = (await cookies()).get(`ms_link_${id}`)?.value;
@@ -67,7 +70,7 @@ export default async function FichaSolicitacao({ params, searchParams }: Props) 
           {s.sintoma_risco && <div className="note crit">Cliente relatou sintoma de risco. Ele já recebeu a orientação de evitar rodar com a moto.</div>}
           <div className="panel stack">
             <p className="label">Cliente</p>
-            <p><b>{cliente?.nome_completo}</b><br />
+            <p><b>{cliente ? <Link href={`/painel/clientes/${cliente.id}`}>{cliente.nome_completo}</Link> : null}</b><br />
               <span className="mono">{cliente ? telefoneBR(cliente.telefone) : ''}</span>{cliente?.email && <> · {cliente.email}</>}<br />
               <span className="small muted">Prefere contato por {cliente?.preferencia_contato}</span></p>
             <p className="label">Scooter</p>
@@ -86,6 +89,10 @@ export default async function FichaSolicitacao({ params, searchParams }: Props) 
               {s.disponibilidade && <><dt className="muted">Disponibilidade</dt><dd style={{ margin: 0 }}>{s.disponibilidade}</dd></>}
               <dt className="muted">Recebida</dt><dd style={{ margin: 0 }}>{dataHora(s.criado_em)}</dd>
             </dl>
+          </div>
+
+          <div className="panel">
+            <Anexos solicitacaoId={s.id} anexos={anexos} podeEnviar />
           </div>
 
           <div className="panel">
