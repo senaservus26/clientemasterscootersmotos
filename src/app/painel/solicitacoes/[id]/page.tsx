@@ -1,9 +1,12 @@
 import Link from 'next/link';
+import { cookies, headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { equipeAtual } from '@/lib/equipe';
 import { PRIORIDADE, STATUS, classeStatus, dataHora, diaCurto, hojeSP, hora, somarDias, telefoneBR } from '@/lib/rotulos';
-import { cancelarAgendamento, confirmarAgendamento, salvarTriagem } from '../../actions';
+import { cancelarAgendamento, confirmarAgendamento, gerarLinkAcompanhamento, revogarLinkAcompanhamento, salvarTriagem } from '../../actions';
 import { Aviso, NavPainel } from '../../navegacao';
+import { Anexos } from '@/components/anexos';
+import { listarAnexos } from '@/lib/anexos';
 
 export const metadata = { title: 'Solicitação · Painel' };
 
@@ -12,23 +15,31 @@ type Props = { params: Promise<{ id: string }>; searchParams: Promise<Record<str
 export default async function FichaSolicitacao({ params, searchParams }: Props) {
   const { id } = await params;
   const sp = await searchParams;
-  const { supabase, nome, definePrioridade } = await equipeAtual();
+  const { supabase, nome, admin, definePrioridade } = await equipeAtual();
 
   const { data: s } = await supabase.from('solicitacoes')
-    .select('id, protocolo, status, prioridade, descricao, sintomas, inicio_problema, quilometragem, disponibilidade, sintoma_risco, tempo_estimado_min, preferencia_inicio, criado_em, clientes(nome_completo, telefone, email, preferencia_contato), veiculos(marca, modelo, ano, placa), servicos(slug, nome, duracao_minutos)')
+    .select('id, protocolo, status, prioridade, descricao, sintomas, inicio_problema, quilometragem, disponibilidade, sintoma_risco, tempo_estimado_min, preferencia_inicio, criado_em, clientes(id, nome_completo, telefone, email, preferencia_contato), veiculos(marca, modelo, ano, placa), servicos(slug, nome, duracao_minutos)')
     .eq('id', id).maybeSingle();
   if (!s) notFound();
-  const cliente = s.clientes as unknown as { nome_completo: string; telefone: string; email: string | null; preferencia_contato: string } | null;
+  const cliente = s.clientes as unknown as { id: string; nome_completo: string; telefone: string; email: string | null; preferencia_contato: string } | null;
   const veiculo = s.veiculos as unknown as { marca: string; modelo: string; ano: number; placa: string | null } | null;
   const servico = s.servicos as unknown as { slug: string; nome: string; duracao_minutos: number } | null;
 
-  const [{ data: eventos }, { data: notas }, { data: agendamento }, { data: servicos }, { data: sintomas }] = await Promise.all([
+  const [{ data: eventos }, { data: notas }, { data: agendamento }, { data: servicos }, { data: sintomas }, { data: linkAtivo }, anexos] = await Promise.all([
     supabase.from('solicitacao_eventos').select('id, status_novo, descricao, visivel_cliente, criado_em').eq('solicitacao_id', id).order('id', { ascending: false }),
     supabase.from('notas_internas').select('id, texto, criado_em').eq('solicitacao_id', id).order('id', { ascending: false }),
     supabase.from('agendamentos').select('id, inicio, fim, recursos(nome)').eq('solicitacao_id', id).eq('estado', 'confirmado').maybeSingle(),
     supabase.from('servicos').select('slug, nome, duracao_minutos').eq('ativo', true).order('ordem'),
     supabase.from('sintomas').select('slug, texto, risco'),
+    supabase.from('acessos_protocolo').select('expira_em').eq('solicitacao_id', id).is('revogado_em', null)
+      .gt('expira_em', new Date().toISOString()).maybeSingle(),
+    listarAnexos(supabase, id),
   ]);
+  // o link completo só existe aqui logo depois de gerado (cookie de 5 minutos); o banco guarda só o hash
+  const tokenGerado = (await cookies()).get(`ms_link_${id}`)?.value;
+  const h = await headers();
+  const site = process.env.NEXT_PUBLIC_SITE_URL || `${h.get('x-forwarded-proto') ?? 'https'}://${h.get('host')}`;
+  const linkGerado = tokenGerado ? `${site.replace(/\/$/, '')}/p/${tokenGerado}` : null;
   const textoSintoma = new Map((sintomas ?? []).map((x) => [x.slug, x]));
   const encerrada = s.status === 'concluido' || s.status === 'cancelado';
 
@@ -43,7 +54,7 @@ export default async function FichaSolicitacao({ params, searchParams }: Props) 
 
   return (
     <div className="wrap page">
-      <NavPainel atual="solicitacoes" nome={nome} />
+      <NavPainel atual="solicitacoes" nome={nome} admin={admin} />
       <p className="label"><Link href="/painel">Solicitações</Link></p>
       <div className="row" style={{ justifyContent: 'space-between', margin: '8px 0 12px' }}>
         <h2 className="mono" style={{ margin: 0 }}>{s.protocolo}</h2>
@@ -59,7 +70,7 @@ export default async function FichaSolicitacao({ params, searchParams }: Props) 
           {s.sintoma_risco && <div className="note crit">Cliente relatou sintoma de risco. Ele já recebeu a orientação de evitar rodar com a moto.</div>}
           <div className="panel stack">
             <p className="label">Cliente</p>
-            <p><b>{cliente?.nome_completo}</b><br />
+            <p><b>{cliente ? <Link href={`/painel/clientes/${cliente.id}`}>{cliente.nome_completo}</Link> : null}</b><br />
               <span className="mono">{cliente ? telefoneBR(cliente.telefone) : ''}</span>{cliente?.email && <> · {cliente.email}</>}<br />
               <span className="small muted">Prefere contato por {cliente?.preferencia_contato}</span></p>
             <p className="label">Scooter</p>
@@ -78,6 +89,10 @@ export default async function FichaSolicitacao({ params, searchParams }: Props) 
               {s.disponibilidade && <><dt className="muted">Disponibilidade</dt><dd style={{ margin: 0 }}>{s.disponibilidade}</dd></>}
               <dt className="muted">Recebida</dt><dd style={{ margin: 0 }}>{dataHora(s.criado_em)}</dd>
             </dl>
+          </div>
+
+          <div className="panel">
+            <Anexos solicitacaoId={s.id} anexos={anexos} podeEnviar />
           </div>
 
           <div className="panel">
@@ -161,6 +176,30 @@ export default async function FichaSolicitacao({ params, searchParams }: Props) 
                 <p className="small muted">Ao confirmar, o banco revalida box, expediente, bloqueios e capacidade do dia.</p>
               </>
             )}
+          </div>
+
+          <div className="panel stack">
+            <p className="label">Link de acompanhamento</p>
+            <p className="small">Para o cliente acompanhar sem fazer login. Mostra só a situação e as datas, sem nome, telefone ou placa.</p>
+            {linkGerado ? (
+              <div className="note ok stack"><span className="small">Copie agora. Por segurança, o link completo não aparece de novo.</span>
+                <span className="link-gerado">{linkGerado}</span></div>
+            ) : linkAtivo ? (
+              <p className="small">Há um link ativo até {dataHora(linkAtivo.expira_em)}.</p>
+            ) : <p className="small muted">Nenhum link ativo.</p>}
+            <div className="row">
+              <form action={gerarLinkAcompanhamento} className="inline">
+                <input type="hidden" name="solicitacaoId" value={s.id} />
+                <button className="btn small" type="submit">{linkAtivo ? 'Gerar novo link' : 'Gerar link'}</button>
+              </form>
+              {linkAtivo && (
+                <form action={revogarLinkAcompanhamento} className="inline">
+                  <input type="hidden" name="solicitacaoId" value={s.id} />
+                  <button className="btn small" type="submit">Desativar link</button>
+                </form>
+              )}
+            </div>
+            {linkAtivo && !linkGerado && <p className="small muted">Gerar um novo link desativa o anterior.</p>}
           </div>
 
           {notas?.length ? (

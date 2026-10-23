@@ -3,6 +3,8 @@ import { notFound, redirect } from 'next/navigation';
 import { supabaseServidor } from '@/lib/supabase/server';
 import { STATUS, classeStatus, dataHora, diaCurto, hojeSP, hora, somarDias } from '@/lib/rotulos';
 import { indicarPreferencia } from '../../actions';
+import { Anexos } from '@/components/anexos';
+import { listarAnexos } from '@/lib/anexos';
 
 export const metadata = { title: 'Solicitação' };
 
@@ -20,9 +22,10 @@ export default async function Solicitacao({ params, searchParams }: Props) {
     .eq('id', id).maybeSingle();
   if (!s) notFound();
   const servico = s.servicos as unknown as { slug: string; nome: string } | null;
-  const [{ data: eventos }, { data: agendamento }] = await Promise.all([
+  const [{ data: eventos }, { data: agendamento }, anexos] = await Promise.all([
     supabase.from('solicitacao_eventos').select('id, status_novo, descricao, criado_em').eq('solicitacao_id', id).order('id', { ascending: false }),
     supabase.from('agendamentos').select('inicio').eq('solicitacao_id', id).eq('estado', 'confirmado').maybeSingle(),
+    listarAnexos(supabase, id),
   ]);
 
   // escolha de horário: só depois da avaliação e enquanto não houver preferência pendente
@@ -73,6 +76,8 @@ export default async function Solicitacao({ params, searchParams }: Props) {
             <p className="small muted">Só aparecem horários com box livre dentro do expediente. A oficina ainda precisa confirmar.</p>
           </div>
         )}
+
+        <Anexos solicitacaoId={s.id} anexos={anexos} podeEnviar={!['concluido', 'cancelado'].includes(s.status)} />
 
         <div>
           <p className="label" style={{ marginBottom: 8 }}>Andamento</p>

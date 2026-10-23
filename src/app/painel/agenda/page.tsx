@@ -19,7 +19,7 @@ function limites(periodo: string): [string, string] {
 }
 
 export default async function Agenda({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const { supabase, nome } = await equipeAtual();
+  const { supabase, nome, admin } = await equipeAtual();
   const sp = await searchParams;
   const hoje = hojeSP();
   const dia = sp.dia && /^\d{4}-\d{2}-\d{2}$/.test(sp.dia) ? sp.dia : hoje;
@@ -57,7 +57,7 @@ export default async function Agenda({ searchParams }: { searchParams: Promise<R
 
   return (
     <div className="wrap page">
-      <NavPainel atual="agenda" nome={nome} />
+      <NavPainel atual="agenda" nome={nome} admin={admin} />
       <nav className="days" aria-label="Dias" style={{ marginBottom: 12 }}>
         {dias.map((d) => <Link key={d} className="day" aria-pressed={d === dia} href={`?dia=${d}`} scroll={false}>{diaCurto(d)}</Link>)}
       </nav>
